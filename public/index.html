@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>环形进度条</title>
+</head>
+
+<body>
+  <div style="width:300px; height:300px; margin:20px auto">
+    <canvas id="cycCanvas" width="300" height="300">
+      <p>您的浏览器不支持canvas</p>
+    </canvas>
+  </div>
+  <div style="width:300px; height:300px; margin:20px auto">
+    <canvas id="cycCanvas1" width="300" height="300">
+      <p>您的浏览器不支持canvas</p>
+    </canvas>
+  </div>
+</body>
+<script type="text/javascript">
+
+  /**
+   * 画圆
+   * @param {number} cx x坐标
+   * @param {number} cy y坐标
+   * @param {number} r  半径
+   * @param {number} lineWidth  线宽度
+   * @return null
+   */
+  function circle(ctx, cx, cy, r, lineWidth) {
+    if (!ctx) return
+    ctx.beginPath();
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = '#eee';
+    ctx.arc(cx, cy, r, 0, (Math.PI * 2), true);
+    ctx.stroke();
+  }
+
+  /**
+    * 画弧线
+    * @param {number} cx x坐标
+    * @param {number} cy y坐标
+    * @param {number} r  半径
+    * @param {number} lineWidth  线宽度
+    * @param {number} startAngle 开始角度 按照360算
+    * @param {number} endAngle 结束角度 按照360算
+    * @return null
+    */
+  function sector(ctx, cx, cy, r, lineWidth, startAngle = 0, endAngle = 360) {
+    if (!ctx) return
+    ctx.beginPath();
+    ctx.lineWidth = lineWidth;
+
+    // 渐变色
+    let linGrad = ctx.createLinearGradient(
+      cx - r - lineWidth, cy, cx + r + lineWidth, cy
+    );
+    linGrad.addColorStop(0.0, '#ffcc99');
+    linGrad.addColorStop(0.5, '#99ff66');
+    linGrad.addColorStop(1.0, '#66ccff');
+    ctx.strokeStyle = linGrad;
+
+    // 单色
+    // ctx.strokeStyle = 'red';
+
+    //圆弧两端的样式
+    ctx.lineCap = 'round';
+
+    //圆弧
+    const _startAng = Math.PI * ((startAngle - 172.5 ) / 180)
+    const _endAng = Math.PI * ((endAngle - 172.5) / 180)
+    console.log(_startAng, _endAng)
+    ctx.arc(
+      cx, cy, r,
+      _startAng,
+      _endAng,
+      false
+    );
+    ctx.stroke();
+  }
+
+  /**
+    * 刷新进度条
+    * @param {number} cx x坐标
+    * @param {number} cy y坐标
+    * @param {number} r  半径
+    * @param {number} lineWidth  线宽度
+    * @param {number} process 完成进度
+    * @return null
+    */
+  function freshProgress(ctx, cx, cy, r, lineWidth, process) {
+
+    if (!ctx) return
+
+    //清除canvas内容
+    ctx.clearRect(0, 0, cx * 2, cy * 2);
+
+    //中间的字
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#999';
+    ctx.fillText(parseFloat(process).toFixed(0) + '%', cx, cy);
+
+    //圆形
+    circle(ctx, cx, cy, r, lineWidth);
+
+    //圆弧
+    sector(ctx, cx, cy, r, lineWidth, 0, process * 3.6);
+  }
+
+  /**
+    * 绘制进度条 有动画的
+    * @param {string} id canvas 组件的id
+    * @param {number} progress 进度 最大100 是一圈
+    * @param {number} time 执行时间 单位秒 p.s. 好像算的有点不对 大概
+    */
+  function drawProgress(id, progress, time = 1) {
+    const canvas = document.getElementById(id), // canvas进度条
+      circleX = canvas.width / 2,  //中心x坐标
+      circleY = canvas.height / 2,  //中心y坐标
+      radius = 100, //圆环半径
+      lineWidth = 20, //圆形线条的宽度
+      delay = time / progress * 1000; // 延迟时间
+
+    const ctx = canvas.getContext("2d");
+    let nowProgress = 0;  //显示进度
+    let circleLoading = window.setInterval(function () {
+      if (nowProgress > progress) {
+        clearInterval(circleLoading);
+      } else {
+        freshProgress(ctx, circleX, circleY, radius, lineWidth, nowProgress);
+        nowProgress += 1.0;
+      }
+
+    }, delay);
+
+  }
+  /**
+    * 刷新百分比
+    * @param {number} cx x坐标
+    * @param {number} cy y坐标
+    * @param {number} r  半径
+    * @param {number} lineWidth  线宽度
+    * @param {array} data 数据的 number 数组
+    * @param {number} process 完成进度
+    * @return null
+    */
+  function freshPrecentage(ctx, cx, cy, r, lineWidth, data, process) {
+    if (!ctx) return
+    //清除canvas内容
+    ctx.clearRect(0, 0, cx * 2, cy * 2);
+    if (data.length) {
+      const sum = data.reduce((prev, next) => prev + next)
+      
+      const space = data.length > 1 ? (data.length) * 15 : 0;
+      let _startAng = 0
+      const resmap = data.map(element => {
+        const item = { startAngle: _startAng, endAngle: _startAng + element / sum * (360 - space), element, sum }
+        if (process >= _startAng) {
+          const endArg = Math.min(item.endAngle, process)
+          sector(ctx, cx, cy, r, lineWidth, item.startAngle, endArg);
+        }
+        _startAng = item.endAngle + 15
+        return item
+      });
+    }
+  }
+
+  /**
+    * 绘制百分比 有动画的
+    * @param {string} id canvas 组件的id
+    * @param {array} data 数据的 number 数组
+    * @param {number} time 执行时间 单位秒 p.s. 好像算的有点不对 大概
+    */
+  function drawPercentage(id, data = [], time = 1) {
+    const canvas = document.getElementById(id), // canvas进度条
+      circleX = canvas.width / 2,  //中心x坐标
+      circleY = canvas.height / 2,  //中心y坐标
+      radius = 100, //圆环半径
+      lineWidth = 20, //圆形线条的宽度
+      delay = time ;
+    const ctx = canvas.getContext("2d");
+    let nowProgress = 0;  //显示进度
+    let circleLoading = window.setInterval(function () {
+      if (nowProgress > 100) {
+        clearInterval(circleLoading);
+      } else {
+        freshPrecentage(ctx, circleX, circleY, radius, lineWidth, [1,1,1,1,1,1], nowProgress * 3.6)
+        nowProgress += 1.0;
+      }
+
+    }, delay);
+
+  }
+
+  //调用
+  drawProgress('cycCanvas', 75);
+  drawPercentage('cycCanvas1', [1, 2, 3, 4]);
+
+</script>
+
+</html>
